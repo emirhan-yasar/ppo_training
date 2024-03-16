@@ -1,0 +1,49 @@
+#pragma kernel CSHiddenLayer
+#pragma kernel CSOutputLayer
+
+int num_neurons_in;
+int num_neurons_out;
+
+RWStructuredBuffer<float> inputs;
+RWStructuredBuffer<float> weights;
+RWStructuredBuffer<float> biases;
+RWStructuredBuffer<float> values;
+
+float sigmoid(const float val)
+{
+    return 1.0/(1.0 + exp(-val));
+}
+float swish(const float val)
+{
+    return val / (1.0 + exp(-val));
+}
+float linear_clip(const float val)
+{
+    // Deterministic:
+    return clamp(val, -3.0, 3.0) / 3.0;
+}
+
+[numthreads(8,1,1)]
+void CSHiddenLayer (uint3 id : SV_DispatchThreadID)
+{
+    float output = biases[id.x];
+    for (int num_in = 0; num_in < num_neurons_in; num_in++)
+    {
+        output += weights[id.x * num_neurons_in + num_in] * inputs[num_in];
+    }
+    output = swish(output);
+    values[id.x] = output;
+}
+
+[numthreads(2,1,1)]
+void CSOutputLayer (uint3 id : SV_DispatchThreadID)
+{
+    float output = biases[id.x];
+    for (int num_in = 0; num_in < num_neurons_in; num_in++)
+    {
+        output += weights[id.x * num_neurons_in + num_in] * inputs[num_in];
+    }
+    output = linear_clip(output);
+    values[id.x] = output;
+}
+
